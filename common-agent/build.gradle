@@ -48,6 +48,7 @@ tasks.named('go_revive_run').configure {
     finalizedBy go_test
 }
 
+// Common dependencies for both Go build tasks
 def goBuildTasks = [tasks.named('go_linux_build'), tasks.named('go_mac_os_build')]
 goBuildTasks.each { task ->
     task.configure {
@@ -56,6 +57,7 @@ goBuildTasks.each { task ->
     }
 }
 
+// The Docker build should happen after the Go builds are complete
 tasks.named('docker_build').configure {
     dependsOn go_build
 }
