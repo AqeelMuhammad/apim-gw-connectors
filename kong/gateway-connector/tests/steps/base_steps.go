@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 
 	"github.com/cucumber/godog"
 	"github.com/wso2-extensions/apim-gw-agents/kong/gateway-connector/tests/pkg/constants"
@@ -151,15 +150,22 @@ func iHaveValidPublisherAccessToken(ctx *utils.SharedContext) error {
 // theResponseStatusCodeShouldBe checks if the response status code matches the expected status code.
 func theResponseStatusCodeShouldBe(ctx *utils.SharedContext, expectedStatusCode int) error {
 	// Get the actual status code from the response
-	actualStatusCode := ctx.GetResponse().StatusCode
+	resp := ctx.GetResponse()
+	if resp == nil {
+		return fmt.Errorf("response is nil: no HTTP response available to check status code")
+	}
+
+	actualStatusCode := resp.StatusCode
 
 	// Close the response body
-	if err := ctx.GetResponse().Body.Close(); err != nil {
+	if err := resp.Body.Close(); err != nil {
 		return fmt.Errorf("error closing response body: %v", err)
 	}
 
 	// Assert that the actual status code matches the expected one
-	assert.Equal(nil, actualStatusCode, expectedStatusCode)
+	if actualStatusCode != expectedStatusCode {
+		return fmt.Errorf("expected status code %d but got %d", expectedStatusCode, actualStatusCode)
+	}
 	return nil
 }
 

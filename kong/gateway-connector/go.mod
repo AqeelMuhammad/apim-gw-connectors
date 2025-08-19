@@ -7,7 +7,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/kong/kubernetes-configuration v0.0.36
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/wso2-extensions/apim-gw-agents/common-agent v0.0.0-00010101000000-000000000000
 	github.com/wso2/apk/adapter v0.0.0-20250301092338-35fc1435165d
@@ -59,7 +58,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.21.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect

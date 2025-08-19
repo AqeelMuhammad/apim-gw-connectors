@@ -36,6 +36,8 @@ import (
 
 // FetchRateLimitPoliciesOnEvent fetches the policies from the control plane on the start up and notification event updates
 func FetchRateLimitPoliciesOnEvent(ratelimitName string, organization string, c client.Client) {
+	logger.LoggerSynchronizer.Debugf("Starting rate limit policy fetch|ratelimitName:%s organization:%s\n", ratelimitName, organization)
+
 	// Read configurations and derive the eventHub details
 	conf, errReadConfig := config.ReadConfigs()
 	if errReadConfig != nil {
@@ -73,6 +75,8 @@ func FetchRateLimitPoliciesOnEvent(ratelimitName string, organization string, c 
 
 // FetchSubscriptionRateLimitPoliciesOnEvent fetches the policies from the control plane on the start up and notification event updates
 func FetchSubscriptionRateLimitPoliciesOnEvent(ratelimitName string, organization string, c client.Client, cleanupDeletedPolicies bool) {
+	logger.LoggerSynchronizer.Debugf("Starting subscription rate limit policy fetch|ratelimitName:%s organization:%s cleanupDeletedPolicies:%v\n", ratelimitName, organization, cleanupDeletedPolicies)
+
 	// read configurations and derive the eventHub details
 	conf, errReadConfig := config.ReadConfigs()
 	if errReadConfig != nil {

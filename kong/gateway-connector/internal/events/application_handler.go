@@ -19,6 +19,8 @@ import (
 
 // HandleApplicationEvents to process application related events
 func HandleApplicationEvents(data []byte, eventType string, c client.Client) {
+	logger.LoggerMessaging.Debugf("Processing application event|EventType:%s\n", eventType)
+
 	conf, _ := config.ReadConfigs()
 
 	if strings.EqualFold(eventConstants.ApplicationRegistration, eventType) ||
@@ -83,7 +85,7 @@ func HandleApplicationEvents(data []byte, eventType string, c client.Client) {
 			// production
 			createApplicationConsumer(applicationEvent.UUID, c, conf, constants.ProductionType)
 			// sandbox
-			createApplicationConsumer(applicationEvent.UUID, c, conf, constants.SanboxType)
+			createApplicationConsumer(applicationEvent.UUID, c, conf, constants.SandboxType)
 		} else if applicationEvent.Event.Type == eventConstants.ApplicationUpdate {
 			logger.LoggerMessaging.Info("Application update")
 		} else if applicationEvent.Event.Type == eventConstants.ApplicationDelete {
@@ -97,6 +99,8 @@ func HandleApplicationEvents(data []byte, eventType string, c client.Client) {
 }
 
 func createIssuerKongSecretCredential(issuerSecret v1.Secret, c client.Client, conf *config.Config, applicationUUID string, consumerKey string, environment string) *v1.Secret {
+	logger.LoggerMessaging.Debugf("Creating issuer Kong secret credential|ApplicationUUID:%s Environment:%s\n", applicationUUID, environment)
+
 	rsaPublicKey := issuerSecret.Data["public_key"]
 	jwtCredentialSecretConfig := map[string]string{
 		"algorithm":      "RS256",
@@ -114,6 +118,8 @@ func createIssuerKongSecretCredential(issuerSecret v1.Secret, c client.Client, c
 }
 
 func createApplicationConsumer(applicationUUID string, c client.Client, conf *config.Config, environment string) {
+	logger.LoggerMessaging.Debugf("Creating application consumer|ApplicationUUID:%s Environment:%s\n", applicationUUID, environment)
+
 	consumer := transformer.CreateConsumer(applicationUUID, environment)
 	consumer.Namespace = conf.DataPlane.Namespace
 

@@ -104,17 +104,22 @@ func InitializeHTTPRoutesState() {
 			for _, route := range routes {
 				updateHTTPRouteLabel(route, "revisionID", revisionID)
 			}
+			loggers.LoggerWatcher.Debugf("Revision ID updated: %s", revisionID)
 		} else {
-			api.RevisionID = revisionID // Use existing consistent revisionID
+			api.RevisionID = revisionID
+			loggers.LoggerWatcher.Debugf("Using existing revision ID: %s", revisionID)
 		}
 
 		discoverPkg.APIMap[apiUUID] = api
 		loggers.LoggerWatcher.Infof("Initialized discoverPkg.API %s with %d HTTPRoutes", apiUUID, len(routes))
 	}
+	loggers.LoggerWatcher.Debugf("HTTPRoutes state initialization completed with %d APIs", len(routesByUUID))
 }
 
 // handleAddHttpRouteResource handles the addition of an HTTPRoute
 func handleAddHttpRouteResource(u *unstructured.Unstructured) {
+	loggers.LoggerWatcher.Debugf("Processing new HTTPRoute: %s/%s", u.GetNamespace(), u.GetName())
+
 	// If to hide the API in CP
 	showInCP, found := u.GetLabels()["showInCP"]
 	if found && showInCP == "false" {
@@ -174,6 +179,8 @@ func handleAddHttpRouteResource(u *unstructured.Unstructured) {
 
 // handleUpdateHTTPRouteResource handles the update of an HTTPRoute
 func handleUpdateHTTPRouteResource(_, newU *unstructured.Unstructured) {
+	loggers.LoggerWatcher.Debugf("Processing HTTPRoute update|%s/%s\n", newU.GetNamespace(), newU.GetName())
+
 	// If to hide the API in CP
 	showInCP, found := newU.GetLabels()["showInCP"]
 	if found && showInCP == "false" {
@@ -208,6 +215,7 @@ func handleUpdateHTTPRouteResource(_, newU *unstructured.Unstructured) {
 		discoverPkg.APIMap[apiUUID] = api
 		discoverPkg.QueueEvent(managementserver.CreateEvent, api, newU.GetName(), newU.GetNamespace())
 		updateHTTPRouteLabel(newU, "revisionID", revisionID)
+		loggers.LoggerWatcher.Infof("API updated|UUID:%s Revision:%s\n", apiUUID, revisionID)
 	} else {
 		loggers.LoggerWatcher.Infof("discoverPkg.API %s unchanged after updating %s/%s, skipping CP update", apiUUID, newU.GetNamespace(), newU.GetName())
 	}
@@ -215,6 +223,8 @@ func handleUpdateHTTPRouteResource(_, newU *unstructured.Unstructured) {
 
 // handleDeleteHttpRouteResource handles the deletion of an HTTPRoute
 func handleDeleteHttpRouteResource(u *unstructured.Unstructured) {
+	loggers.LoggerWatcher.Debugf("Processing HTTPRoute deletion|%s/%s\n", u.GetNamespace(), u.GetName())
+
 	apiUUID, found := u.GetLabels()["apiUUID"]
 	if !found {
 		loggers.LoggerWatcher.Warnf("HTTPRoute %s/%s has no apiUUID label, skipping deletion", u.GetNamespace(), u.GetName())
@@ -245,6 +255,8 @@ func handleDeleteHttpRouteResource(u *unstructured.Unstructured) {
 
 // fetchAllHTTPRoutesWithAPIUUID fetches all HTTPRoutes with a given apiUUID
 func fetchAllHTTPRoutesWithAPIUUID(namespace, apiUUID string) []*unstructured.Unstructured {
+	loggers.LoggerWatcher.Debugf("Fetching HTTPRoutes with apiUUID|%s\n", apiUUID)
+
 	gvr := schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
 	selector := labels.SelectorFromSet(map[string]string{"apiUUID": apiUUID})
 	list, err := CRWatcher.DynamicClient.Resource(gvr).Namespace(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
@@ -267,6 +279,8 @@ func fetchAllHTTPRoutesWithAPIUUID(namespace, apiUUID string) []*unstructured.Un
 
 // buildAPIFromHTTPRoutes constructs an discoverPkg.API from a list of HTTPRoutes
 func buildAPIFromHTTPRoutes(httpRoutes []*unstructured.Unstructured, apiVersion string, apiUUID string) managementserver.API {
+	loggers.LoggerWatcher.Debugf("Building API from HTTPRoutes|UUID:%s Routes:%d\n", apiUUID, len(httpRoutes))
+
 	api := managementserver.API{
 		APIUUID:          apiUUID,
 		APIName:          fmt.Sprintf("api-%s", apiUUID),
@@ -293,9 +307,12 @@ func buildAPIFromHTTPRoutes(httpRoutes []*unstructured.Unstructured, apiVersion 
 
 // updateAPIFromHTTPRoute merges HTTPRoute data into an existing discoverPkg.API
 func updateAPIFromHTTPRoute(api *managementserver.API, u *unstructured.Unstructured) {
+	loggers.LoggerWatcher.Debugf("Updating API from HTTPRoute|%s/%s\n", u.GetNamespace(), u.GetName())
+
 	// If to hide the API in CP
 	showInCP, found := u.GetLabels()["showInCP"]
 	if found && showInCP == "false" {
+		loggers.LoggerWatcher.Debugf("HTTPRoute hidden from CP, skipping|%s/%s\n", u.GetNamespace(), u.GetName())
 		return
 	}
 
@@ -377,12 +394,6 @@ func updateAPIFromHTTPRoute(api *managementserver.API, u *unstructured.Unstructu
 			switch pluginType {
 			case "cors":
 				api.CORSPolicy = extractCORSPolicyFromKongPlugin(kongPlugin)
-				// case "rate-limiting":
-				// 	if api.Environment == "production" {
-				// 		api.ProdAIRL = extractRateLimitFromKongPlugin(kongPlugin)
-				// 	} else if api.Environment == "sandbox" {
-				// 		api.SandAIRL = extractRateLimitFromKongPlugin(kongPlugin)
-				// 	}
 			}
 		}
 	}
@@ -390,6 +401,8 @@ func updateAPIFromHTTPRoute(api *managementserver.API, u *unstructured.Unstructu
 
 // fetchKongPlugin retrieves a KongPlugin CR by name
 func fetchKongPlugin(namespace, name string) *unstructured.Unstructured {
+	loggers.LoggerWatcher.Debugf("Fetching KongPlugin|%s/%s\n", namespace, name)
+
 	gvr := schema.GroupVersionResource{
 		Group:    "configuration.konghq.com",
 		Version:  "v1",
@@ -405,6 +418,8 @@ func fetchKongPlugin(namespace, name string) *unstructured.Unstructured {
 
 // extractOperations pulls operations from HTTPRoute rules
 func extractOperations(httpRoute *unstructured.Unstructured) []managementserver.OperationFromDP {
+	loggers.LoggerWatcher.Debugf("Extracting operations from HTTPRoute|%s/%s\n", httpRoute.GetNamespace(), httpRoute.GetName())
+
 	var operations []managementserver.OperationFromDP
 
 	// Access spec.rules from unstructured data
@@ -414,6 +429,7 @@ func extractOperations(httpRoute *unstructured.Unstructured) []managementserver.
 		return operations
 	}
 	if !found || len(rules) == 0 {
+		loggers.LoggerWatcher.Debugf("No rules found for HTTPRoute %s/%s", httpRoute.GetNamespace(), httpRoute.GetName())
 		return operations
 	}
 
@@ -470,6 +486,8 @@ func operationExists(ops []managementserver.OperationFromDP, newOp managementser
 
 // extractBasePath finds a common prefix among all operation paths
 func extractBasePath(operations []managementserver.OperationFromDP) string {
+	loggers.LoggerWatcher.Debugf("Extracting base path|%d operations\n", len(operations))
+
 	var paths []string
 	for _, op := range operations {
 		paths = append(paths, op.Path)
@@ -482,6 +500,8 @@ func extractBasePath(operations []managementserver.OperationFromDP) string {
 
 // findCommonPrefix computes the longest common prefix among paths
 func findCommonPrefix(paths []string) string {
+	loggers.LoggerWatcher.Debugf("Finding common prefix|%d paths\n", len(paths))
+
 	if len(paths) == 0 {
 		return "/"
 	}
@@ -511,6 +531,8 @@ func findCommonPrefix(paths []string) string {
 
 // extractCORSPolicyFromKongPlugin pulls CORS details from a KongPlugin
 func extractCORSPolicyFromKongPlugin(kongPlugin *unstructured.Unstructured) *managementserver.CORSPolicy {
+	loggers.LoggerWatcher.Debugf("Extracting CORS policy|%s\n", kongPlugin.GetName())
+
 	cors := &managementserver.CORSPolicy{
 		AccessControlAllowCredentials: false,
 		AccessControlAllowOrigins:     []string{},
@@ -551,6 +573,8 @@ func extractCORSPolicyFromKongPlugin(kongPlugin *unstructured.Unstructured) *man
 
 // extractRateLimitFromKongPlugin pulls rate limit details from a KongPlugin
 func extractRateLimitFromKongPlugin(kongPlugin *unstructured.Unstructured) *managementserver.AIRL {
+	loggers.LoggerWatcher.Debugf("Extracting rate limit|%s\n", kongPlugin.GetName())
+
 	rl := &managementserver.AIRL{
 		TimeUnit: "min", // Default to "min" as per allowedTimeUnits
 	}
@@ -581,6 +605,8 @@ func generateRevisionID() string {
 
 // updateHTTPRouteLabel updates a label on the HTTPRoute
 func updateHTTPRouteLabel(u *unstructured.Unstructured, key, value string) {
+	loggers.LoggerWatcher.Debugf("Updating HTTPRoute label|%s=%s\n", key, value)
+
 	labels, found, _ := unstructured.NestedMap(u.Object, "metadata", "labels")
 	if !found {
 		labels = make(map[string]interface{})

@@ -32,6 +32,8 @@ var allowedTimeUnits = map[string]string{"min": "minute", "hours": "hour", "days
 
 // GetUniqueIDForAPI will generate a unique ID for newly created APIs
 func GetUniqueIDForAPI(name, version, organization string) string {
+	loggers.LoggerUtils.Debugf("Generating unique ID|Name:%s Version:%s Org:%s\n", name, version, organization)
+
 	concatenatedString := strings.Join([]string{organization, name, version}, "-")
 	hash := sha1.New()
 	hash.Write([]byte(concatenatedString))
@@ -41,6 +43,9 @@ func GetUniqueIDForAPI(name, version, organization string) string {
 
 // GenerateOperationsMatrix creates a 2D array for operations
 func GenerateOperationsMatrix(specialOps int, normalOps int, maxColumns int) [][]types.Operation {
+	loggers.LoggerUtils.Debugf("Creating operations matrix|Special:%d Normal:%d MaxCols:%d\n",
+		specialOps, normalOps, maxColumns)
+
 	// special operations need their own rows
 	totalRows := specialOps + ((normalOps + maxColumns - 1) / maxColumns)
 	operationsArray := make([][]types.Operation, totalRows)
@@ -62,6 +67,8 @@ func GenerateOperationsMatrix(specialOps int, normalOps int, maxColumns int) [][
 
 // GeneratePluginCRName generates a reference name for a plugin based on the operation, target reference, and plugin name.
 func GeneratePluginCRName(operation *types.Operation, targetRef string, pluginName string) string {
+	loggers.LoggerUtils.Debugf("Generating plugin CR name|Plugin:%s TargetRef:%s\n", pluginName, targetRef)
+
 	concatenatedString := pluginName
 	if operation != nil {
 		operationTargetHash := fmt.Sprintf("%x", sha1.Sum([]byte(operation.Target+operation.Verb)))
@@ -75,23 +82,31 @@ func GeneratePluginCRName(operation *types.Operation, targetRef string, pluginNa
 
 // GeneratePolicyCRName generates a reference name for a policy plugin.
 func GeneratePolicyCRName(policName string, tenantDomain string, pluginName string, policyType string) string {
+	loggers.LoggerUtils.Debugf("Generating policy CR name|Policy:%s Type:%s\n", policName, policyType)
+
 	serviceTargetHash := fmt.Sprintf("%x", sha1.Sum([]byte(policName+tenantDomain+pluginName)))
 	return policyType + "-" + serviceTargetHash + "-" + pluginName
 }
 
 // GenerateConsumerName generates a reference name for a consumer
 func GenerateConsumerName(applicationUUID string, environment string) string {
+	loggers.LoggerUtils.Debugf("Generating consumer name|App:%s Env:%s\n", applicationUUID, environment)
+
 	consumerHash := fmt.Sprintf("%x", sha1.Sum([]byte(applicationUUID+environment)))
 	return "consumer-" + consumerHash + "-" + environment
 }
 
 // GenerateSecretName generates a reference name for a k8s secret
 func GenerateSecretName(applicationUUID string, apiUUID string, secretType string) string {
+	loggers.LoggerUtils.Debugf("Generating secret name|App:%s API:%s Type:%s\n", applicationUUID, apiUUID, secretType)
+
 	return "secret-" + generateSHA1Hash(applicationUUID+apiUUID) + "-" + secretType
 }
 
 // GenerateACLGroupName generates a kong acl API group name
 func GenerateACLGroupName(apiName string, environment string) string {
+	loggers.LoggerUtils.Debugf("Generating ACL group name|API:%s Env:%s\n", apiName, environment)
+
 	return "api-" + generateSHA1Hash(apiName) + "-" + environment
 }
 
@@ -106,6 +121,8 @@ func GenerateJSON(data KongPluginConfig) []byte {
 
 // PrepareRateLimit adds the corresponding rate limit name and values to kong plugin config
 func PrepareRateLimit(rateLimitConfig *KongPluginConfig, unit string, requestsPerUnit int) {
+	loggers.LoggerUtils.Debugf("Preparing rate limit|Unit:%s Requests:%d\n", unit, requestsPerUnit)
+
 	// Add corresponding rate limit configuration
 	if unitName, ok := allowedTimeUnits[unit]; ok {
 		(*rateLimitConfig)[unitName] = requestsPerUnit
@@ -123,6 +140,8 @@ func generateSHA1Hash(input string) string {
 
 // PrepareSecretName converts string for a k8s secret
 func PrepareSecretName(name string) string {
+	loggers.LoggerUtils.Debugf("Preparing secret name|Input:%s\n", name)
+
 	lowercaseString := strings.ToLower(name)
 	result := strings.ReplaceAll(lowercaseString, " ", "-")
 	return result

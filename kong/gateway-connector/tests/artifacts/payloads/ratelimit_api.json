@@ -81,5 +81,5 @@
             }
         }
     ],
-    "gatewayType":"wso2/apk"
+    "gatewayType":"Kong"
 }

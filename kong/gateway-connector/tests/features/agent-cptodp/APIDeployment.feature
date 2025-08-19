@@ -35,7 +35,7 @@ Feature: API Deployment
     And the response body should contain "accessToken"
     Then I set headers
       | Authorization | Bearer ${accessToken} |
-    And I send "GET" request to "https://default.gw.wso2.com:8443/petstore/1.0.0/pet/4" with body ""
+    And I send "GET" request to "https://kong.wso2.com:8443/petstore/1.0.0/pet/4" with body ""
     And I eventually receive 200 response code, not accepting
       | 429 |
 
@@ -48,6 +48,6 @@ Feature: API Deployment
     Then I find the apiUUID of the API created with the name "SwaggerPetstore"
     Then I undeploy the selected API
     Then the response status code should be 200
-    And I send "GET" request to "https://default.gw.wso2.com:8443/petstore/1.0.0/pet/4" with body ""
+    And I send "GET" request to "https://kong.wso2.com:8443/petstore/1.0.0/pet/4" with body ""
     And I eventually receive 404 response code, not accepting
       | 200 |

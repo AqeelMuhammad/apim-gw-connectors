@@ -38,6 +38,8 @@ import (
 
 // GenerateCR handles the generation k8s artifacts
 func GenerateCR(api string, organizationID string, apiUUID string) *K8sArtifacts {
+	logger.LoggerUtils.Debugf("GenerateCR|Starting CR generation|API:%s Org:%s\n", apiUUID, organizationID)
+
 	kongPlugins := make([]string, 0)
 	var apkConf types.APKConf
 	err := yaml.Unmarshal([]byte(api), &apkConf)
@@ -93,6 +95,7 @@ func GenerateCR(api string, organizationID string, apiUUID string) *K8sArtifacts
 
 		k8sArtifact.KongPlugins[kongRateLimitPlugin.ObjectMeta.Name] = kongRateLimitPlugin
 		kongPlugins = append(kongPlugins, kongRateLimitPlugin.ObjectMeta.Name)
+		logger.LoggerUtils.Debugf("GenerateCR|Rate limit plugin added|%s\n", kongRateLimitPlugin.ObjectMeta.Name)
 	}
 
 	// create cors configurations
@@ -109,23 +112,31 @@ func GenerateCR(api string, organizationID string, apiUUID string) *K8sArtifacts
 
 		k8sArtifact.KongPlugins[kongCorsPlugin.ObjectMeta.Name] = kongCorsPlugin
 		kongPlugins = append(kongPlugins, kongCorsPlugin.ObjectMeta.Name)
+		logger.LoggerUtils.Debugf("GenerateCR|CORS plugin added|%s\n", kongCorsPlugin.ObjectMeta.Name)
 	}
 
 	// HTTPRoute
 	// generate production http routes
 	if endpoints, ok := createdEndpoints[constants.ProductionType]; ok {
 		generateHTTPRoutes(&k8sArtifact, &apkConf, organizationID, endpoints, constants.ProductionType, apiUniqueID, kongPlugins)
+		logger.LoggerUtils.Debugf("GenerateCR|Production HTTPRoutes generated|%d endpoints\n", len(endpoints))
 	}
 	// generate sandbox http routes
-	if endpoints, ok := createdEndpoints[constants.SanboxType]; ok {
-		generateHTTPRoutes(&k8sArtifact, &apkConf, organizationID, endpoints, constants.SanboxType, apiUniqueID, kongPlugins)
+	if endpoints, ok := createdEndpoints[constants.SandboxType]; ok {
+		generateHTTPRoutes(&k8sArtifact, &apkConf, organizationID, endpoints, constants.SandboxType, apiUniqueID, kongPlugins)
+		logger.LoggerUtils.Debugf("GenerateCR|Sandbox HTTPRoutes generated|%d endpoints\n", len(endpoints))
 	}
 
+	logger.LoggerUtils.Infof("GenerateCR|CR generation completed|HTTPRoutes:%d Services:%d Plugins:%d\n",
+		len(k8sArtifact.HTTPRoutes), len(k8sArtifact.Services), len(k8sArtifact.KongPlugins))
 	return &k8sArtifact
 }
 
 // UpdateCRS cr update
 func UpdateCRS(k8sArtifact *K8sArtifacts, environments *[]apimTransformer.Environment, organizationID string, apiUUID string, revisionID string, namespace string, configuredRateLimitPoliciesMap map[string]eventHub.RateLimitPolicy) {
+	logger.LoggerUtils.Debugf("UpdateCRS|Starting CR update|API:%s Revision:%s Environments:%d\n",
+		apiUUID, revisionID, len(*environments))
+
 	organizationHash := generateSHA1Hash(organizationID)
 
 	// generate Cors Configurations for the gateway
@@ -142,19 +153,17 @@ func UpdateCRS(k8sArtifact *K8sArtifacts, environments *[]apimTransformer.Enviro
 	// k8sArtifact.KongPlugins[corsPlugin.ObjectMeta.Name] = corsPlugin
 
 	for _, httproute := range k8sArtifact.HTTPRoutes {
-		// TODO: add cors plugin to httproute
 		httproute.ObjectMeta.Labels[k8sOrganizationField] = organizationHash
 		httproute.ObjectMeta.Labels[k8sAPIUuidField] = apiUUID
 		httproute.ObjectMeta.Labels[k8sRevisionField] = revisionID
 		// update hostnames
 		for _, environment := range *environments {
 			vhost := environment.Vhost
-			// httproute.Annotations["konghq.com/plugins"] = pkgUtils.PrepareAnnotations(httproute.Annotations["konghq.com/plugins"], []string{corsPlugin.ObjectMeta.Name}, nil)
 
 			if httproute.ObjectMeta.Labels[k8sAPIEnvironmentField] == constants.ProductionType {
 				httproute.Spec.Hostnames = []gwapiv1.Hostname{gwapiv1.Hostname(vhost)}
 			}
-			if httproute.ObjectMeta.Labels[k8sAPIEnvironmentField] == constants.SanboxType {
+			if httproute.ObjectMeta.Labels[k8sAPIEnvironmentField] == constants.SandboxType {
 				httproute.Spec.Hostnames = []gwapiv1.Hostname{gwapiv1.Hostname("sandbox." + vhost)}
 			}
 		}
@@ -175,8 +184,10 @@ func UpdateCRS(k8sArtifact *K8sArtifacts, environments *[]apimTransformer.Enviro
 
 // generateHTTPRoutes handles the generation of http route resources from apk conf
 func generateHTTPRoutes(k8sArtifact *K8sArtifacts, apkConf *types.APKConf, organizationID string, endpoints []types.EndpointDetails, endpointType string, uniqueID string, kongPlugins []string) {
+	logger.LoggerUtils.Debugf("Starting HTTPRoute generation - API Name: %s, API UUID: %s, Organization ID: %s, Endpoint Type: %s, Unique ID: %s, Kong Plugins: %v, Endpoints: %+v, APK Config Name: %s, APK Config Version: %s, APK Config Base Path: %s",
+		k8sArtifact.APIName, k8sArtifact.APIUUID, organizationID, endpointType, uniqueID, kongPlugins, endpoints, apkConf.Name, apkConf.Version, apkConf.BasePath)
+
 	// ACL Plugin (for subscription)
-	// create and add route restriction with Kong ACL plugin into k8s artifacts
 	if apkConf.SubscriptionValidation {
 		apiEnvironmentGroup := GenerateACLGroupName(k8sArtifact.APIName, endpointType)
 		allowList := []string{apiEnvironmentGroup}
@@ -188,6 +199,8 @@ func generateHTTPRoutes(k8sArtifact *K8sArtifacts, apkConf *types.APKConf, organ
 		// 	},
 		// }
 		kongPlugins = append(kongPlugins, kongACLPlugin.ObjectMeta.Name)
+		logger.LoggerUtils.Debugf("ACL plugin added for subscription validation - API Name: %s, Endpoint Type: %s, Plugin Name: %s, API Environment Group: %s, Allow List: %v",
+			k8sArtifact.APIName, endpointType, kongACLPlugin.ObjectMeta.Name, apiEnvironmentGroup, allowList)
 	}
 
 	gen := httpGenerator.Generator()
@@ -200,10 +213,12 @@ func generateHTTPRoutes(k8sArtifact *K8sArtifacts, apkConf *types.APKConf, organ
 
 	operationsArray := prepareOperationsArray(apkConf)
 	for i, operations := range operationsArray {
-		logger.LoggerUtils.Infof("Generate Operations: %v\n", operations)
+		logger.LoggerUtils.Debugf("Processing operations array - Index: %d, Operations: %+v, Organization ID: %s, Gateway Name: %s, Listener Name: %s",
+			i, operations, organizationID, gatewayConfigurations.Name, gatewayConfigurations.ListenerName)
 		httpK8sArtifact, err := gen.GenerateHTTPRoute(*apkConf, organization, gatewayConfigurations, operations, &endpoints, endpointType, uniqueID, i)
 		if err != nil {
-			logger.LoggerUtils.Errorf("Error while generating http route: Error: %+v. \n", err)
+			logger.LoggerUtils.Errorf("Failed to generate HTTPRoute - API Name: %s, API UUID: %s, Organization ID: %s, Endpoint Type: %s, Operations Index: %d, Error: %v",
+				k8sArtifact.APIName, k8sArtifact.APIUUID, organizationID, endpointType, i, err)
 		} else {
 			routeKongPlugins := kongPlugins
 			httpRoute := httpK8sArtifact.HTTPRoute
@@ -238,6 +253,8 @@ func generateHTTPRoutes(k8sArtifact *K8sArtifacts, apkConf *types.APKConf, organ
 					k8sArtifact.KongPlugins[rateLimitPlugin.ObjectMeta.Name] = rateLimitPlugin
 
 					routeKongPlugins = append(routeKongPlugins, rateLimitPlugin.ObjectMeta.Name)
+					logger.LoggerUtils.Debugf("Operation rate limit plugin added - API Name: %s, Operation Target: %s, Base Path: %s, Plugin Name: %s, Rate Limit Unit: %s, Requests Per Unit: %d, Path Prefix: %s",
+						k8sArtifact.APIName, operationTarget, basePath, rateLimitPlugin.ObjectMeta.Name, operation.RateLimit.Unit, operation.RateLimit.RequestsPerUnit, utils.RetrievePathPrefix(operationTarget, basePath))
 				}
 
 				// create and add endpoint security configurations for production environment
@@ -252,8 +269,18 @@ func generateHTTPRoutes(k8sArtifact *K8sArtifacts, apkConf *types.APKConf, organ
 				// }
 			}
 
-			// store the services into k8s artifacts
+			// store the services into k8s artifacts and add Kong-specific annotations
 			for key, service := range httpK8sArtifact.Services {
+				if service.ObjectMeta.Annotations == nil {
+					service.ObjectMeta.Annotations = make(map[string]string)
+				}
+				kongAnnotations := map[string]string{
+					"konghq.com/protocol": utils.GetProtocol(endpoints[0].URL),
+				}
+				for kongKey, kongValue := range kongAnnotations {
+					service.ObjectMeta.Annotations[kongKey] = kongValue
+				}
+
 				k8sArtifact.Services[key] = service
 			}
 
@@ -267,11 +294,18 @@ func generateHTTPRoutes(k8sArtifact *K8sArtifacts, apkConf *types.APKConf, organ
 			// store httproute in k8s artifacts
 			httpRoute.Labels["routeType"] = "api"
 			k8sArtifact.HTTPRoutes[httpRoute.ObjectMeta.Name] = httpRoute
+			logger.LoggerUtils.Debugf("HTTPRoute stored successfully - Route Name: %s, API Name: %s, Endpoint Type: %s, Route Kong Plugins: %v, Annotations: %v",
+				httpRoute.ObjectMeta.Name, k8sArtifact.APIName, endpointType, routeKongPlugins, annotationMap)
 		}
 	}
+
+	logger.LoggerUtils.Infof("HTTPRoute generation completed - API Name: %s, API UUID: %s, Endpoint Type: %s, Total Operations Arrays: %d, Total HTTPRoutes: %d, Total Services: %d",
+		k8sArtifact.APIName, k8sArtifact.APIUUID, endpointType, len(operationsArray), len(k8sArtifact.HTTPRoutes), len(k8sArtifact.Services))
 }
 
 func prepareOptionsHTTPRoute(httpRoute *gwapiv1.HTTPRoute) *gwapiv1.HTTPRoute {
+	logger.LoggerUtils.Debugf("Preparing OPTIONS HTTPRoute|Original:%s\n", httpRoute.Name)
+
 	optionsHttpRoute := httpRoute.DeepCopy()
 	optionsHttpRoute.Name = optionsHttpRoute.Name + "-options"
 	optionsHttpRoute.Labels["routeType"] = "options"
@@ -294,6 +328,8 @@ func prepareOptionsHTTPRoute(httpRoute *gwapiv1.HTTPRoute) *gwapiv1.HTTPRoute {
 }
 
 func prepareOperationsArray(apkConf *types.APKConf) [][]types.Operation {
+	logger.LoggerUtils.Debugf("Preparing operations array|TotalOps:%d\n", len(*apkConf.Operations))
+
 	specialOps := []types.Operation{}
 	normalOps := []types.Operation{}
 
@@ -335,6 +371,8 @@ func prepareOperationsArray(apkConf *types.APKConf) [][]types.Operation {
 
 // createAndAddACLPlugin handles the Kong ACL credential plugin generation and adding to k8s resources
 func createAndAddACLPlugin(k8sArtifact *K8sArtifacts, operation *types.Operation, targetRef string, environment string, allowList []string) *v1.KongPlugin {
+	logger.LoggerUtils.Debugf("Creating ACL plugin|TargetRef:%s Environment:%s\n", targetRef, environment)
+
 	config := KongPluginConfig{
 		"allow": allowList,
 	}
@@ -346,6 +384,8 @@ func createAndAddACLPlugin(k8sArtifact *K8sArtifacts, operation *types.Operation
 
 // createAndAddJWTPlugin handles the Kong JWT credential plugin generation and adding to k8s resources
 func createAndAddJWTPlugin(k8sArtifact *K8sArtifacts, operation *types.Operation, targetRef string, authentication types.AuthConfiguration) *v1.KongPlugin {
+	logger.LoggerUtils.Debugf("Creating JWT plugin|TargetRef:%s Enabled:%v\n", targetRef, authentication.Enabled)
+
 	headerNames := []string{}
 	queryParamNames := []string{}
 	if authentication.HeaderEnabled {
@@ -375,6 +415,8 @@ func createAndAddJWTPlugin(k8sArtifact *K8sArtifacts, operation *types.Operation
 
 // createAndAddAPIKeyPlugin handles the Kong API Key credential plugin generation and adding to k8s resources
 func createAndAddAPIKeyPlugin(k8sArtifact *K8sArtifacts, operation *types.Operation, targetRef string, authentication types.AuthConfiguration) *v1.KongPlugin {
+	logger.LoggerUtils.Debugf("Creating API Key plugin|TargetRef:%s Enabled:%v\n", targetRef, authentication.Enabled)
+
 	keyNames := []string{}
 	if authentication.HeaderName != "" {
 		keyNames = append(keyNames, authentication.HeaderName)
@@ -397,14 +439,19 @@ func createAndAddAPIKeyPlugin(k8sArtifact *K8sArtifacts, operation *types.Operat
 
 // updateHTTPRouteAnnotations updates the annotations of httproutes
 func updateHTTPRouteAnnotations(httpRoute *gwapiv1.HTTPRoute, annotations map[string]string) {
-	httpRoute.Annotations = make(map[string]string, 0)
+	logger.LoggerUtils.Debugf("Updating HTTPRoute annotations|Route:%s Annotations:%d\n",
+		httpRoute.Name, len(annotations))
+
+	httpRoute.Annotations = make(map[string]string, len(annotations))
 	for key, annotation := range annotations {
-		httpRoute.Annotations[key] = strings.Join([]string{annotation, httpRoute.Annotations[key]}, ",")
+		httpRoute.Annotations[key] = annotation
 	}
 }
 
 // CreateConsumer handles the Kong consumer generation
 func CreateConsumer(applicationUUID string, environment string) *v1.KongConsumer {
+	logger.LoggerUtils.Debugf("Creating Kong consumer|App:%s Env:%s\n", applicationUUID, environment)
+
 	consumer := v1.KongConsumer{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "KongConsumer",
@@ -428,6 +475,9 @@ func CreateConsumer(applicationUUID string, environment string) *v1.KongConsumer
 
 // GenerateK8sCredentialSecret handles the k8s secret generation for kong credentials
 func GenerateK8sCredentialSecret(applicationUUID string, identifier string, credentialName string, data map[string]string) *corev1.Secret {
+	logger.LoggerUtils.Debugf("Generating credential secret|App:%s Credential:%s\n",
+		applicationUUID, credentialName)
+
 	secret := corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -447,6 +497,8 @@ func GenerateK8sCredentialSecret(applicationUUID string, identifier string, cred
 
 // GenerateK8sSecret handles the k8s secret generation
 func GenerateK8sSecret(name string, labels map[string]string, data map[string]string) *corev1.Secret {
+	logger.LoggerUtils.Debugf("Generating k8s secret|Name:%s Labels:%d\n", name, len(labels))
+
 	secret := corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
@@ -463,6 +515,8 @@ func GenerateK8sSecret(name string, labels map[string]string, data map[string]st
 
 // GenerateKongPlugin handles the Kong plugin generation
 func GenerateKongPlugin(operation *types.Operation, pluginName string, targetRef string, config KongPluginConfig, enabled bool) *v1.KongPlugin {
+	logger.LoggerUtils.Debugf("Generating Kong plugin|Plugin:%s Enabled:%v\n", pluginName, enabled)
+
 	return &v1.KongPlugin{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "KongPlugin",

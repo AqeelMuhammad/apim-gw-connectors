@@ -19,6 +19,8 @@ import (
 
 // HandleSubscriptionEvents to process subscription related events
 func HandleSubscriptionEvents(data []byte, eventType string, c client.Client) {
+	logger.LoggerMessaging.Debugf("Starting subscription event processing|EventType:%s\n", eventType)
+
 	conf, _ := config.ReadConfigs()
 
 	var subscriptionEvent msg.SubscriptionEvent
@@ -38,25 +40,28 @@ func HandleSubscriptionEvents(data []byte, eventType string, c client.Client) {
 	}
 
 	logger.LoggerMessaging.Infof("Received Subscription Event: %+v", subscriptionEvent)
-	if subscriptionEvent.Event.Type == eventConstants.SubscriptionCreate {
+	switch subscriptionEvent.Event.Type {
+	case eventConstants.SubscriptionCreate:
 		// create production consumer and acl credential
 		createSubscription(subscriptionEvent, c, conf, constants.ProductionType)
 		// create sandbox consumer and acl credential
-		createSubscription(subscriptionEvent, c, conf, constants.SanboxType)
-	} else if subscriptionEvent.Event.Type == eventConstants.SubscriptionUpdate {
+		createSubscription(subscriptionEvent, c, conf, constants.SandboxType)
+	case eventConstants.SubscriptionUpdate:
 		// update production consumer and configurations
 		updateSubscription(subscriptionEvent, c, conf, constants.ProductionType)
 		// update sandbox consumer and configurations
-		updateSubscription(subscriptionEvent, c, conf, constants.SanboxType)
-	} else if subscriptionEvent.Event.Type == eventConstants.SubscriptionDelete {
+		updateSubscription(subscriptionEvent, c, conf, constants.SandboxType)
+	case eventConstants.SubscriptionDelete:
 		// remove production ACL credentials and consumer
 		removeSubscription(subscriptionEvent, c, conf, constants.ProductionType)
 		// remove sandbox ACL credentials and consumer
-		removeSubscription(subscriptionEvent, c, conf, constants.SanboxType)
+		removeSubscription(subscriptionEvent, c, conf, constants.SandboxType)
 	}
 }
 
 func createSubscription(subscriptionEvent msg.SubscriptionEvent, c client.Client, conf *config.Config, environment string) {
+	logger.LoggerMessaging.Debugf("Creating subscription|ApplicationUUID:%s Environment:%s\n", subscriptionEvent.ApplicationUUID, environment)
+
 	addCredentials := []string{}
 	addAnnotations := []string{}
 
@@ -96,6 +101,8 @@ func createSubscription(subscriptionEvent msg.SubscriptionEvent, c client.Client
 }
 
 func updateSubscription(subscriptionEvent msg.SubscriptionEvent, c client.Client, conf *config.Config, environment string) {
+	logger.LoggerMessaging.Debugf("Updating subscription|ApplicationUUID:%s Environment:%s\n", subscriptionEvent.ApplicationUUID, environment)
+
 	var removeAnnotations []string
 	var addAnnotations []string
 	// retrieving current production subscription policy
@@ -132,14 +139,15 @@ func updateSubscription(subscriptionEvent msg.SubscriptionEvent, c client.Client
 		subscriptionIdentifier := subscriptionEvent.APIUUID + environment
 		aclCredentialSecretName := transformer.GenerateSecretName(subscriptionEvent.ApplicationUUID, subscriptionIdentifier, "acl")
 		credentials := []string{aclCredentialSecretName}
-		if subscriptionEvent.SubscriptionState == "BLOCKED" {
-			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.SanboxType, c, conf, nil, credentials)
+		switch subscriptionEvent.SubscriptionState {
+		case "BLOCKED":
+			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.SandboxType, c, conf, nil, credentials)
 			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.ProductionType, c, conf, nil, credentials)
-		} else if subscriptionEvent.SubscriptionState == "PROD_ONLY_BLOCKED" {
-			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.SanboxType, c, conf, credentials, nil)
+		case "PROD_ONLY_BLOCKED":
+			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.SandboxType, c, conf, credentials, nil)
 			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.ProductionType, c, conf, nil, credentials)
-		} else if subscriptionEvent.SubscriptionState == "UNBLOCKED" {
-			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.SanboxType, c, conf, credentials, nil)
+		case "UNBLOCKED":
+			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.SandboxType, c, conf, credentials, nil)
 			internalk8sClient.UpdateKongConsumerCredential(subscriptionEvent.ApplicationUUID, constants.ProductionType, c, conf, credentials, nil)
 		}
 	}
@@ -147,6 +155,8 @@ func updateSubscription(subscriptionEvent msg.SubscriptionEvent, c client.Client
 }
 
 func removeSubscription(subscriptionEvent msg.SubscriptionEvent, c client.Client, conf *config.Config, environment string) {
+	logger.LoggerMessaging.Debugf("Removing subscription|ApplicationUUID:%s Environment:%s\n", subscriptionEvent.ApplicationUUID, environment)
+
 	subscriptionIdentifier := subscriptionEvent.APIUUID + environment
 	aclSecretCredentialName := transformer.GenerateSecretName(subscriptionEvent.ApplicationUUID, subscriptionIdentifier, "acl")
 

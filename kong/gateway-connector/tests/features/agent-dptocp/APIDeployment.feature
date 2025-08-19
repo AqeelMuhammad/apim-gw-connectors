@@ -31,14 +31,14 @@ Feature: API Deploying in DP to CP Flow
     And the response body should contain "accessToken"
     Then I set headers
       | Authorization | bearer ${accessToken} |
-    And I send "GET" request to "https://default.gw.wso2.com:8443/httpbin/1.0.0/get" with body ""
+    And I send "GET" request to "https://kong.wso2.com:8443/httpbin/1.0.0/get" with body ""
     And I eventually receive 200 response code, not accepting
       | 429 |
-    And the response body should contain "http://default.gw.wso2.com/get"
-    And I send "POST" request to "https://default.gw.wso2.com:8443/httpbin/1.0.0/post" with body ""
+    And the response body should contain "http://kong.wso2.com/get"
+    And I send "POST" request to "https://kong.wso2.com:8443/httpbin/1.0.0/post" with body ""
     And I eventually receive 200 response code, not accepting
       | 429 |
-    And the response body should contain "http://default.gw.wso2.com/post"
+    And the response body should contain "http://kong.wso2.com/post"
 
   Scenario Outline: Undeploy API
     Given The system is ready

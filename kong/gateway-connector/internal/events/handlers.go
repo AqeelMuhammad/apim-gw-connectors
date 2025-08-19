@@ -31,6 +31,8 @@ var (
 
 // HandleLifeCycleEvents handles the events of an api through out the life cycle
 func HandleLifeCycleEvents(data []byte) {
+	logger.LoggerMessaging.Debugf("Processing API lifecycle event")
+
 	var apiEvent msg.APIEvent
 	apiLCEventErr := json.Unmarshal([]byte(string(data)), &apiEvent)
 	if apiLCEventErr != nil {
@@ -52,6 +54,8 @@ func HandleLifeCycleEvents(data []byte) {
 
 // HandleAPIEvents to process api related data
 func HandleAPIEvents(data []byte, eventType string, conf *config.Config, c client.Client) {
+	logger.LoggerMessaging.Debugf("Processing API event|EventType:%s\n", eventType)
+
 	var (
 		apiEvent         msg.APIEvent
 		currentTimeStamp int64 = apiEvent.Event.TimeStamp
@@ -116,6 +120,8 @@ func HandleAPIEvents(data []byte, eventType string, conf *config.Config, c clien
 
 // HandlePolicyEvents to process policy related events
 func HandlePolicyEvents(data []byte, eventType string, c client.Client) {
+	logger.LoggerMessaging.Debugf("Processing policy event|EventType:%s\n", eventType)
+
 	conf, _ := config.ReadConfigs()
 
 	var policyEvent msg.PolicyInfo
@@ -161,7 +167,6 @@ func HandlePolicyEvents(data []byte, eventType string, c client.Client) {
 			managementserver.DeleteSubscriptionPolicy(policyEvent.PolicyName, policyEvent.TenantDomain)
 			crName := transformer.GeneratePolicyCRName(policyEvent.PolicyName, policyEvent.TenantDomain, "rate-limiting", "subscription")
 			internalk8sClient.UnDeployKongPluginCR(crName, c, conf)
-			// TODO: undeploy AI ratelimit plugin
 			ratelimitPolicies := managementserver.GetAllRateLimitPolicies()
 			logger.LoggerMessaging.Infof("Rate Limit Policies Internal Map: %v", ratelimitPolicies)
 		}
@@ -170,6 +175,8 @@ func HandlePolicyEvents(data []byte, eventType string, c client.Client) {
 
 // HandleAIProviderEvents to process AI Provider related events
 func HandleAIProviderEvents(data []byte, eventType string, client client.Client) {
+	logger.LoggerMessaging.Debugf("Processing AI provider event|EventType:%s\n", eventType)
+
 	var aiProviderEvent msg.AIProviderEvent
 	aiProviderEventErr := json.Unmarshal([]byte(string(data)), &aiProviderEvent)
 	if aiProviderEventErr != nil {
@@ -182,6 +189,8 @@ func HandleAIProviderEvents(data []byte, eventType string, client client.Client)
 
 // HandleScopeEvents to process scope related events
 func HandleScopeEvents(data []byte, eventType string, client client.Client) {
+	logger.LoggerMessaging.Debugf("Processing scope event|EventType:%s\n", eventType)
+
 	var scopeEvent msg.ScopeEvent
 	scopeEventErr := json.Unmarshal([]byte(string(data)), &scopeEvent)
 	if scopeEventErr != nil {
@@ -209,6 +218,8 @@ func isLaterEvent(timeStampMap map[string]int64, mapKey string, currentTimeStamp
 }
 
 func marshalAppAttributes(attributes interface{}) map[string]string {
+	logger.LoggerMessaging.Debugf("Marshaling application attributes|true")
+
 	attributesMap := make(map[string]string)
 	if attributes != nil {
 		for key, value := range attributes.(map[string]interface{}) {

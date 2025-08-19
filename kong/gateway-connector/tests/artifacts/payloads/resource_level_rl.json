@@ -146,6 +146,6 @@
             }
         }
     ],
-    "gatewayVendor": "wso2",
-    "gatewayType": "wso2/apk"
+    "gatewayVendor": "external",
+    "gatewayType": "Kong"
 }

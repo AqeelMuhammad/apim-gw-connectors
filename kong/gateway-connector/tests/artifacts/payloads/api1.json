@@ -2,7 +2,7 @@
   "name":"SwaggerPetstore",
   "version":"1.0.0",
   "context":"/petstore",
-  "gatewayType":"wso2/apk",
+  "gatewayType":"Kong",
   "endpointConfig":{
     "endpoint_type":"https",
     "sandbox_endpoints":{
