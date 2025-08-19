@@ -246,7 +246,7 @@ func makeAPIRevisionDeploymentRequest(ctx *utils.SharedContext) error {
 	// Sleep for 3 seconds to simulate the delay
 	time.Sleep(3 * time.Second)
 
-	payload2 := "[{\"name\": \"kong_k8s_gw\", \"vhost\": \"kong.wso2.com\", \"displayOnDevportal\": true}]"
+	payload2 := fmt.Sprintf(`[{"name": "%s", "vhost": "%s", "displayOnDevportal": true}]`, constants.GatewayName, constants.GatewayVHost)
 
 	// Print request details for revision deployment
 	apiRevisionDeploymentURL := utils.GetAPIRevisionDeploymentURL(apiUUID, revisionUUID)
